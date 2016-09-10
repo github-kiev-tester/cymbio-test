@@ -1,0 +1,20 @@
+<?php
+/** @var Mage_Catalog_Model_Product $product */
+$product = $this->getProduct();
+?>
+<div class="add-to-cart">
+    <div class="add-to-cart-buttons">
+        <button type="button" id="extra-cymbio-button" title="<?php echo $this->__("Additonal Button"); ?>" class="button btn-cart"><span><span><?php echo "Additonal Button" ?></span></span></button>
+        <input type="hidden" name="use_cymbio" value="0"/>
+    </div>
+</div>
+
+<script>
+    $('extra-cymbio-button').onclick = function() {
+        if (productAddToCartForm.validator.validate()) {
+            $$('input[name=use_cymbio]')[0].value = 1;
+            productAddToCartForm.submit(this);
+            $$('input[name=use_cymbio]')[0].value = 0; //set value to zero again after request was send
+        }
+    }
+</script>
