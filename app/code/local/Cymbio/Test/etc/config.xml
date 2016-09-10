@@ -2,7 +2,7 @@
 <config>
     <modules>
         <Cymbio_Test>
-            <version>0.1.1.1</version>
+            <version>0.1.1</version>
         </Cymbio_Test>
     </modules>
     <global>
@@ -53,10 +53,16 @@
         </events>
     </frontend>
     <default>
-        <cymbio_api_url>
-            <general>
-                <url>https://server-staging.cym.bio/v1/events/</url>
-            </general>
-        </cymbio_api_url>
+        <add_to_cart_cymbio_request>
+            <method>POST</method>
+            <uri>https://server-staging.cym.bio/v1/events/</uri>
+            <params>
+                <action>ADD_TO_CART</action>
+                <referrer>%store.name%</referrer>
+                <store_id>%store.store_id%</store_id>
+                <product_id>%product.entity_id%</product_id>
+                <query>ADD_TO_CART</query>
+            </params>
+        </add_to_cart_cymbio_request>
     </default>
 </config>

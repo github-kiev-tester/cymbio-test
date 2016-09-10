@@ -5,13 +5,6 @@
  */
 class Cymbio_Test_Model_Observer
 {
-    /** @var array */
-    private $apiParams = [];
-
-    /** @var array */
-    private $actionMap = array(
-        'addToCart' => 'ADD_TO_CART'
-    );
 
     /**
      * @param Mage_Catalog_Model_Product $product
@@ -47,24 +40,6 @@ class Cymbio_Test_Model_Observer
         }
     }
 
-    /**
-     * @param Varien_Event_Observer $observer
-     */
-    public function addProductToCart(Varien_Event_Observer $observer)
-    {
-        /** @var Mage_Core_Controller_Request_Http $request */
-        $request = $observer->getEvent()->getRequest();
-        /** @var Mage_Catalog_Model_Product $product */
-        $product = $observer->getEvent()->getProduct();
-
-        if ((int)$request->getParam('use_cymbio')) {
-            try {
-                $this->sendApiRequest($product, $this->actionMap['addToCart']);
-            } catch (Exception $e) {
-                Mage::log($e->getMessage(), null, 'cymbio-api-calls.log', true);
-            }
-        }
-    }
 
     public function logCymbioEvent(Varien_Event_Observer $observer)
     {
@@ -88,47 +63,71 @@ class Cymbio_Test_Model_Observer
         }
     }
 
-    /**
-     * @param Mage_Catalog_Model_Product $product
-     */
-    private function sendApiRequest(Mage_Catalog_Model_Product $product, $actionType)
+    public function addProductToCart(Varien_Event_Observer $observer)
     {
-        /** @var Cymbio_Test_Model_Api_Request $apiRequestResult */
-        $apiRequestModel = Mage::getModel('cymbio/api_request');
-        $this->prepareApiParamsBeforeRequest($product, $actionType);
+        /** @var Mage_Core_Controller_Request_Http $request */
+        $request = $observer->getEvent()->getRequest();
+        /** @var Mage_Catalog_Model_Product $product */
+        $product = $observer->getEvent()->getProduct();
 
-        $apiRequestModel->requestApi(
-            $this->apiParams['api_url'],
-            $this->apiParams['config'],
-            $this->apiParams['params_to_send']
-        );
+        if ((int)$request->getParam('use_cymbio')) {
+            $this->sendApiRequest($product);
+        }
     }
 
     /**
-     * @param Mage_Catalog_Model_Product $product
+     * @return false|\Cymbio_Test_Model_Cymbio_Events_ConfigProcessor
      */
-    private function prepareApiParamsBeforeRequest(Mage_Catalog_Model_Product $product, $actionType)
+    private function getConfigProcessor()
     {
-        $url = Mage::getConfig()->getNode('default/cymbio_api_url/general/url');
-        $paramsToSend = [
-            'action' => $actionType,
-            'query' => '',
-            'store_id' => Mage::app()->getStore()->getId(),
-            'product_id' => $product->getId(),
+        return Mage::getModel("cymbio_test/cymbio_events_configProcessor");
+    }
 
-        ];
-        $config = array(
-            'adapter' => 'Zend_Http_Client_Adapter_Curl',
-            'curloptions' => array(
-                CURLOPT_RETURNTRANSFER => false,
-                CURLOPT_REFERER => Mage::getBaseUrl(),
-                CURLOPT_HTTPHEADER => array(
-                    "Content-Type: application/json",
-                )
-            ),
+    /**
+     * @return false|\Cymbio_Test_Model_Cymbio_Events_Builder
+     */
+    private function getRequestBuilder()
+    {
+        return Mage::getModel("cymbio_test/cymbio_events_builder");
+    }
+
+    /**
+     * @param \Mage_Catalog_Model_Product $product
+     */
+    private function sendApiRequest(Mage_Catalog_Model_Product $product)
+    {
+        $params = (array)Mage::app()->getConfig()->getNode("default/add_to_cart_cymbio_request");
+        $configProcessor = $this->getConfigProcessor();
+        $store = Mage::app()->getStore();
+        //Registering entities
+        $configProcessor->registerEntity('store', $store);
+        $configProcessor->registerEntity('product', $product);
+        //Set config path
+        $configProcessor->setConfigPath('default/add_to_cart_cymbio_request/params');
+        $params['params'] = $configProcessor->process();
+
+        $builder = $this->getRequestBuilder();
+        /** @var Zend_Http_Client $client */
+        $client = $builder->build($params);
+
+        /** @var Zend_Http_Response $response */
+        $response = $client->request();
+        $this->registerCymbioResponse($response, $params);
+    }
+
+    /**
+     * @param \Zend_Http_Response $response
+     * @param array $requestParams
+     * @return void
+     */
+    private function registerCymbioResponse(Zend_Http_Response $response, array $requestParams)
+    {
+        Mage::log([
+            "response" => $response->getMessage(),
+            "client" => $requestParams
+        ],
+            null,
+            'cymbio_request.log'
         );
-        $this->apiParams['api_url'] = (string)$url;
-        $this->apiParams['params_to_send'] = (string)$paramsToSend;
-        $this->apiParams['config'] = (string)$config;
     }
 }
